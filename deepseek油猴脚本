@@ -38,7 +38,7 @@
         container.style.bottom = '10px';
         container.style.right = '10px';
         container.style.zIndex = 9999;
-        container.style.background = 'rgba(0, 0, 0, 0.3)';
+        container.style.background = 'rgba(120, 241, 104, 0.79)';
         container.style.color = '#fff';
         container.style.padding = '10px';
         container.style.borderRadius = '5px';
