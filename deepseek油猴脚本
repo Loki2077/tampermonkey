@@ -200,6 +200,8 @@
         if (retryClickCount >= maxClickCount && maxClickCount > 0) {
             showMsg("点击次数上限，自动重试关闭。");
             autoRetryEnabled = false;
+            // 更新容器背景颜色
+            container.style.backgroundColor = autoRetryEnabled ? 'rgba(120, 241, 104, 0.79)' : 'rgba(0, 0, 0, 0.3)';
             document.getElementById('auto-retry-toggle').textContent = '开启自动重试';
             return;
         }
@@ -225,6 +227,8 @@
                     showMsg("模拟点击 重新生成 按钮");
                     if (typeof retryElement.click === "function") {
                         retryElement.click();
+                        // 模拟点击成功后，重置倒计时
+                        countdown = jgtime;
                         showMsg("模拟点击 成功");
                     } else {
                         const event = new MouseEvent("click", {
@@ -242,6 +246,10 @@
                 break;
             }
         }
+
+
+        // 更新容器背景颜色
+        container.style.backgroundColor = autoRetryEnabled ? 'rgba(120, 241, 104, 0.79)' : 'rgba(0, 0, 0, 0.3)';
     }
 
     // 初始化 UI
