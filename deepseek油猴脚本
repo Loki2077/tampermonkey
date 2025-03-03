@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         DeepSeek 自动重试 & 点击次数上限
 // @namespace    http://tampermonkey.net/
-// @version      1.8.2
+// @version      1.8.3
 // @description  当页面中出现“服务器繁忙，请稍后再试”的提示时，自动点击 id 为“重新生成”的元素进行重试。页面右下角显示一个大盒子，包含自动重试开关及点击次数上限设置（含当前计数显示），点击次数达到上限时自动关闭重试。适用于 deepseek 页面。
 // @author       Loki2077
 // @match        https://chat.deepseek.com/*
@@ -22,6 +22,8 @@
     let jgtime = 10;
     // 定义倒计时变量
     let countdown = jgtime;
+    // 提升为全局变量
+    const container = document.createElement('div');
 
     // 定义多个错误提示关键词
     const errorPhrases = [
@@ -32,7 +34,7 @@
 
     // 创建 UI 大盒子，包含开关按钮和点击次数上限设置
     function createUIBox() {
-        const container = document.createElement('div');
+        // const container = document.createElement('div');
         container.id = 'auto-retry-box';
         container.style.position = 'fixed';
         container.style.bottom = '10px';
