@@ -1,202 +1,236 @@
 // ==UserScript==
-// @name         抖音网页版深度清屏、动态清晰度、全屏与跳过直播
+// @name         抖音沉浸模式
 // @namespace    https://douyin.com/
-// @version      1.3
-// @description  监测清屏按钮状态，激活清屏时隐藏多余UI、调整视频布局、自动选择最高清晰度、自动进入网页全屏，并跳过直播视频；取消清屏时恢复原状
+// @version      1.2.4
+// @description  抖音沉浸模式，提供全屏、清屏、最高清晰度等功能，提升观看体验。
 // @author       Loki2077
 // @match        *://www.douyin.com/*
 // @grant        none
 // @license      MIT
-// @downloadURL  https://update.greasyfork.org/scripts/抖音网页版深度清屏.user.js
-// @updateURL    https://update.greasyfork.org/scripts/抖音网页版深度清屏.meta.js
+// @homepageURL  https://github.com/Loki2077/tampermonkey
 // ==/UserScript==
 
 (function() {
     'use strict';
-
-    let clearModeActive = false;
-    // 用于记录被隐藏元素及视频容器原始样式
-    const hiddenElements = new Map();
-
-    // 需要隐藏的选择器列表（根据需要调整）
-    const selectors = [
-        "header",              // 顶部导航栏
-        ".pc-footer",          // 底部信息栏
-        ".layoutHeader",       // 可能的顶部栏
-        ".layoutSide",         // 右侧推荐栏
-        ".layoutSearch",       // 搜索框
-        ".menu-container",     // 侧边菜单
-        ".layoutAside",        // 右侧消息栏
-        "div[data-e2e='live-ad']", // 可能的广告
-        ".comment-container",  // 评论区
-        ".douyin-share",       // 分享按钮
-        ".user-card",          // 用户信息
-        "div[data-e2e='hot-list']", // 可能的热榜
-        ".feedback-button",    // 反馈按钮
-        ".recommend-list",     // 推荐列表
+    
+    // 定义沉浸模式的状态变量，false表示未开启，true表示开启
+    let immersiveMode = false;
+    // 定义一个变量来存储当前的清屏状态
+    let clearScreen = false;
+    // 需要隐藏的元素选择器
+    const hideElements = [
+        '.immersive-player-switch-on-hide-interaction-area',
+        '.video-info-detail',
+        '.KlXLcATm.isDark',
+        '.ixmqWVyr'
     ];
 
-    // 观察清屏按钮状态变化
-    function observeClearScreenButton() {
-        const clearBtn = document.querySelector('.xg-switch');
-        if (!clearBtn) {
-            console.log("未找到清屏按钮");
-            return;
-        }
-        const observer = new MutationObserver(mutations => {
-            mutations.forEach(mutation => {
-                if (mutation.attributeName === "aria-checked") {
-                    const checked = clearBtn.getAttribute("aria-checked");
-                    if (checked === "true" && !clearModeActive) {
-                        activateClearScreen();
-                        clearModeActive = true;
-                    } else if (checked === "false" && clearModeActive) {
-                        restoreScreen();
-                        clearModeActive = false;
-                    }
-                }
-            });
-        });
-        observer.observe(clearBtn, { attributes: true });
-    }
 
-    // 激活清屏模式：隐藏不必要的UI，调整视频样式，自动全屏、选择最高清晰度，并尝试跳过直播
-    function activateClearScreen() {
-        // 隐藏指定的UI元素
-        selectors.forEach(selector => {
-            document.querySelectorAll(selector).forEach(el => {
-                if (!hiddenElements.has(el)) {
-                    hiddenElements.set(el, el.style.display);
-                    el.style.display = "none";
-                }
-            });
-        });
+    /**
+     * 持续运行的主函数
+     * 1. 当按下j键时，切换沉浸模式
+     * 2. 当按下 'w' 's' '方向上' '方向下' '跟轮上' '跟轮下'键 且 开启沉浸模式 时, 清屏
+     */
+    const main = () => {
+        
+        // 监听键盘按下事件
+        document.addEventListener('keydown', (event) => {
+            // 打印按下的键
+            console.log('-----------:' + event.key);
 
-        // 调整视频容器样式（假设视频容器 class 为 .video-player）
-        const videoContainer = document.querySelector('.video-player');
-        if (videoContainer) {
-            if (!hiddenElements.has(videoContainer)) {
-                hiddenElements.set(videoContainer, {
-                    position: videoContainer.style.position,
-                    top: videoContainer.style.top,
-                    left: videoContainer.style.left,
-                    width: videoContainer.style.width,
-                    height: videoContainer.style.height,
-                    zIndex: videoContainer.style.zIndex
-                });
+            // 当按下p键时，切换沉浸模式（不区分大小写）
+            if (event.key.toLowerCase() === 'p') {
+                immersiveMode = !immersiveMode; // 切换沉浸模式状态
+                clearScreen = !clearScreen; // 切换清屏状态
+                switchImmersiveMode(immersiveMode); // 调用切换沉浸模式的函数
             }
-            videoContainer.style.position = "fixed";
-            videoContainer.style.top = "0";
-            videoContainer.style.left = "0";
-            videoContainer.style.width = "100vw";
-            videoContainer.style.height = "100vh";
-            videoContainer.style.zIndex = "9999";
-            document.body.style.overflow = "hidden";
-        }
-
-        // 自动进入网页全屏（非F11）
-        autoFullScreen();
-
-        // 自动选择最高清晰度
-        autoSelectHighestClarity();
-
-        // 自动跳过直播视频
-        autoSkipLive();
-    }
-
-    // 恢复页面原始状态
-    function restoreScreen() {
-        hiddenElements.forEach((value, el) => {
-            if (typeof value === "string") {
-                el.style.display = value;
-            } else if (typeof value === "object") {
-                el.style.position = value.position;
-                el.style.top = value.top;
-                el.style.left = value.left;
-                el.style.width = value.width;
-                el.style.height = value.height;
-                el.style.zIndex = value.zIndex;
+            if (event.key.toLowerCase() === 'j') {
+                clearScreen = !clearScreen; // 切换清屏状态
+                if (clearScreen) {
+                    // 清屏
+                    toggleElementsVisibility(hideElements, 'none');
+                }else{
+                    // 显示元素
+                    toggleElementsVisibility(hideElements, '');
+                }
+            }
+            // 当按下 'w' 's' '方向上' '方向下' 键 且 开启沉浸模式 时, 清屏
+            if (clearScreen && ['w', 's', 'W', 'S', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+                // 清屏
+                toggleElementsVisibility(hideElements, 'none');
+                // 设置清晰度
+                switchMaxResolution();
             }
         });
-        hiddenElements.clear();
-        document.body.style.overflow = "";
-    }
 
-    // 自动选择最高清晰度（遍历所有选项，选择解析出的分辨率最大的一项）
-    function autoSelectHighestClarity() {
-        const clarityGear = document.querySelector('.gear.isSmoothSwitchClarityLogin');
-        if (clarityGear) {
-            const items = clarityGear.querySelectorAll('.item');
-            let maxRes = -1;
-            let targetItem = null;
-            items.forEach(item => {
-                const text = item.textContent;
-                // 提取分辨率，如 "1080P", "720P" 等
-                const match = text.match(/(\d+)\s*[pP]/);
-                if (match) {
-                    const res = parseInt(match[1]);
-                    if (res > maxRes) {
-                        maxRes = res;
-                        targetItem = item;
-                    }
+        // 监听鼠标滚轮事件
+        document.addEventListener('wheel', (event) => {
+            // 判断是否开启清屏模式
+            if (clearScreen) {
+                // 判断滚轮方向
+                if (event.deltaY < 0) {
+                    // 滚轮向上
+                    console.log('Mouse wheel up');
+                    toggleElementsVisibility(hideElements, 'none');
+                    // 设置清晰度
+                    switchMaxResolution();
+                } else if (event.deltaY > 0) {
+                    // 滚轮向下
+                    console.log('Mouse wheel down');
+                    toggleElementsVisibility(hideElements, 'none');
+                    // 设置清晰度
+                    switchMaxResolution();
                 }
+            }
+        });
+
+    }
+    
+
+    /**
+     * 切换最高清晰度
+     */
+    const switchMaxResolution = () => {
+        // 获取所有分辨率选项元素（不区分大小写）
+        const resolutionOptions = Array.from(document.querySelectorAll('div.virtual > div.item'))
+            .filter(el => el.textContent && /[4K|2K|1080P|720P|540P|智能]/i.test(el.textContent.trim()));
+
+        if (resolutionOptions.length > 0) {
+            // 按照优先级排序，选择最高分辨率（假设顺序为：4k > 2k > 1080P > 720P > 540P > 智能），不区分大小写
+            const priorityOrder = ['4K', '2K', '1080P', '720P', '540P', '智能'];
+            resolutionOptions.sort((a, b) => {
+                const aPriority = priorityOrder.indexOf(a.textContent.trim().toLowerCase());
+                const bPriority = priorityOrder.indexOf(b.textContent.trim().toLowerCase());
+                return aPriority - bPriority;
             });
-            if (targetItem && !targetItem.classList.contains("selected")) {
-                targetItem.click();
-                console.log("已切换到最高清晰度: " + maxRes + "P");
+
+            // 获取优先级最高的选项
+            const highestResolutionOption = resolutionOptions[0];
+
+            // 如果该选项未被选中，则点击它
+            if (!highestResolutionOption.classList.contains('selected')) {
+                highestResolutionOption.click();
             } else {
-                console.log("最高清晰度已是当前状态或未找到有效选项");
+                console.log('当前已是最高清晰度');
             }
         } else {
-            console.log("未找到清晰度选择区域");
+            console.error('未找到任何分辨率选项');
         }
     }
 
-    // 自动进入网页全屏（模拟点击页面全屏按钮）
-    function autoFullScreen() {
-        const fullScreenBtn = document.querySelector('.xgplayer-page-full-screen');
-        if (fullScreenBtn) {
-            if (fullScreenBtn.getAttribute("data-state") === "normal") {
-                fullScreenBtn.click();
-                console.log("已切换到网页全屏模式");
+    /**
+     * 模拟按下指定的键
+     * @param {string} key - 要模拟按下的键
+     */
+    const simulateKeyPress = (key) => {
+        const keyCode = key.toUpperCase().charCodeAt(0);
+        const event = new KeyboardEvent('keydown', { 
+            key: key, 
+            code: `Key${key.toUpperCase()}`, 
+            keyCode: keyCode, 
+            charCode: keyCode, 
+            bubbles: true, 
+            cancelable: true 
+        });
+        document.dispatchEvent(event);
+    };
+
+    /**
+     * 切换指定元素的显示状态
+     * @param {string[]} selectors - 元素选择器数组
+     * @param {string} displayState - 目标显示状态 ('none' 或 '')
+     */
+    const toggleElementsVisibility = (selectors, displayState) => {
+        const elements = document.querySelectorAll(selectors.join(', '));
+        elements.forEach(el => {
+            el.style.display = displayState;
+        });
+    };
+
+    /**
+     * 切换沉浸模式
+     * @param {*} immersiveMode 
+     */
+    const switchImmersiveMode = (immersiveMode) => {
+        if (immersiveMode) {
+            // 模拟按下键盘 'Y' 和 'j'
+            simulateKeyPress('Y');
+
+            // 使用全屏API进入全屏模式
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+            } else if (document.documentElement.mozRequestFullScreen) { // Firefox
+                document.documentElement.mozRequestFullScreen();
+            } else if (document.documentElement.webkitRequestFullscreen) { // Chrome, Safari and Opera
+                document.documentElement.webkitRequestFullscreen();
+            } else if (document.documentElement.msRequestFullscreen) { // IE/Edge
+                document.documentElement.msRequestFullscreen();
             }
+            // 切换最高清晰度
+            switchMaxResolution();
+
+            // 调用新方法隐藏指定元素
+            toggleElementsVisibility(hideElements, 'none');
+            
+            // createToast('已进入沉浸模式');
         } else {
-            console.log("未找到网页全屏按钮");
+            // 模拟按下键盘 'Y' 和 'j'
+            simulateKeyPress('Y');
+
+            // 退出全屏模式
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.mozCancelFullScreen) { // Firefox
+                document.mozCancelFullScreen();
+            } else if (document.webkitExitFullscreen) { // Chrome, Safari and Opera
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) { // IE/Edge
+                document.msExitFullscreen();
+            }
+            // 切换最高清晰度
+            switchMaxResolution();
+
+            // 调用新方法恢复显示指定元素
+            toggleElementsVisibility(hideElements, 'none');
+            
+            // createToast('已退出沉浸模式');
         }
     }
 
-    // 自动跳过直播视频（此处仅为示例，需根据实际页面 DOM 调整选择器）
-    function autoSkipLive() {
-        // 延时等待视频状态加载
+    /**
+     * 创建一个提示框显示消息
+     * @param {string} message - 要显示的提示信息
+     */
+    const createToast = (message) => {
+        const toasts = document.querySelectorAll('div[style*="position: fixed; top"]');
+        const verticalOffset = 20 + toasts.length * 50; // 每个弹窗间隔50px
+
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            position: fixed;
+            top: ${verticalOffset}px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            z-index: 999999;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        `;
+        // 设置提示框文本内容
+        toast.textContent = message;
+        
+        // 将提示框添加到页面中
+        document.body.appendChild(toast);
+        
+        // 设置1秒后自动移除提示框
         setTimeout(() => {
-            // 假设直播视频页面存在直播标识（例如 .live-indicator 或 .live-tag）
-            const liveIndicator = document.querySelector('.live-indicator, .live-tag');
-            if (liveIndicator) {
-                // 如果是直播，尝试点击下一个视频按钮（假设选择器为 .next-video-button）
-                const nextBtn = document.querySelector('.next-video-button');
-                if (nextBtn) {
-                    nextBtn.click();
-                    console.log("直播视频，已自动跳过");
-                } else {
-                    console.log("直播视频，但未找到跳过按钮");
-                }
-            } else {
-                console.log("当前视频非直播");
-            }
+            document.body.removeChild(toast);
         }, 1000);
-    }
+    };
 
-    // 辅助：通过键盘 J 键触发（模拟点击清屏按钮）
-    document.addEventListener('keydown', function(event) {
-        if (event.key === 'j' || event.key === 'J') {
-            const clearBtn = document.querySelector('.xg-switch');
-            if (clearBtn) {
-                clearBtn.click();
-            }
-        }
-    });
-
-    // 初始化：开始监听清屏按钮状态变化
-    observeClearScreenButton();
-
+    
+    // 执行主函数，开始监听键盘事件
+    main();
 })();
