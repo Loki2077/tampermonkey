@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         抖音沉浸模式
 // @namespace    https://douyin.com/
-// @version      1.2.4
+// @version      1.2.5
 // @description  抖音沉浸模式，提供全屏、清屏、最高清晰度等功能，提升观看体验。
 // @author       Loki2077
 // @match        *://www.douyin.com/*
