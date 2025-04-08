@@ -22,7 +22,9 @@
         '.immersive-player-switch-on-hide-interaction-area',
         '.video-info-detail',
         '.KlXLcATm.isDark',
-        '.ixmqWVyr'
+        '.ixmqWVyr',
+        '.AXQAavwp',
+        'WLUaedLn'
     ];
 
 
@@ -83,7 +85,15 @@
                 }
             }
         });
+        // 跳过直播 
 
+
+    }
+    /**
+     * 跳过直播 
+     */
+    const skipLive = () => {
+        // 待实现....
     }
     
 
